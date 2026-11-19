@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculadora de profundidad de campo e hiperfocal · Lluís Ridao</title>
+<meta name="description" content="Calcula la profundidad de campo y la distancia hiperfocal según tu sensor, la focal, el diafragma y la distancia de enfoque. Gratis, sin anuncios y sin rastreadores.">
+<style>
+  :root { --bg:#0f1115; --panel:#181b22; --line:#262a33; --txt:#e8e8ea; --muted:#8b8f99; --acc:#f2c14e; --nit:#7ee787; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  main { max-width:720px; margin:0 auto; padding:24px 16px 40px; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 20px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:16px; }
+  .campos { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; }
+  label { display:flex; flex-direction:column; gap:6px; font-size:14px; color:var(--muted); }
+  select, input { font:inherit; color:var(--txt); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:9px 10px; }
+  input[type=range] { padding:0; accent-color:var(--acc); }
+  .val { color:var(--txt); font-weight:600; }
+  .resultados { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .dato { background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  .dato small { color:var(--muted); display:block; font-size:13px; }
+  .dato b { font-size:22px; font-variant-numeric:tabular-nums; }
+  .barra { position:relative; height:46px; margin-top:18px; border-bottom:1px solid var(--line); }
+  .nitido { position:absolute; top:10px; height:22px; background:rgba(126,231,135,.25); border:1px solid var(--nit); border-radius:6px; }
+  .foco { position:absolute; top:4px; width:2px; height:34px; background:var(--acc); }
+  .escala { display:flex; justify-content:space-between; color:var(--muted); font-size:12px; margin-top:4px; }
+  .consejo { color:var(--muted); font-size:14px; margin:14px 0 0; }
+  details { color:var(--muted); font-size:14px; }
+  summary { cursor:pointer; color:var(--txt); }
+  footer { color:var(--muted); font-size:13px; text-align:center; }
+  footer a { color:var(--txt); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Profundidad de campo e hiperfocal</h1>
+  <p class="sub">Qué zona de la foto saldrá nítida según tu cámara, tu objetivo y dónde enfocas.</p>
+
+  <div class="panel campos">
+    <label>Sensor
+      <select id="sensor">
+        <option value="0.030">Fotograma completo (35 mm)</option>
+        <option value="0.020" selected>APS-C (Sony, Nikon, Fujifilm)</option>
+        <option value="0.019">APS-C (Canon)</option>
+        <option value="0.015">Micro Cuatro Tercios</option>
+        <option value="0.011">1 pulgada</option>
+        <option value="0.037">Formato medio 44×33</option>
+        <option value="0.005">Móvil (sensor principal)</option>
+      </select>
+    </label>
+    <label>Focal (mm) <input type="number" id="focal" value="35" min="1" max="1200" step="1"></label>
+    <label>Diafragma: <span class="val" id="vf"></span>
+      <input type="range" id="diaf" min="0" max="17" step="1" value="6">
+    </label>
+    <label>Distancia de enfoque: <span class="val" id="vd"></span>
+      <input type="range" id="dist" min="0" max="100" step="1" value="40">
+    </label>
+  </div>
+
+  <div class="panel">
+    <div class="resultados">
+      <div class="dato"><small>Nítido desde</small><b id="cerca">–</b></div>
+      <div class="dato"><small>Hasta</small><b id="lejos">–</b></div>
+      <div class="dato"><small>Profundidad total</small><b id="total">–</b></div>
+      <div class="dato"><small>Hiperfocal</small><b id="hiper">–</b></div>
+    </div>
+    <div class="barra" aria-hidden="true"><div class="nitido" id="zona"></div><div class="foco" id="foco"></div></div>
+    <div class="escala"><span>0 m</span><span id="esc-med"></span><span id="esc-max"></span></div>
+    <p class="consejo" id="consejo"></p>
+  </div>
+
+  <details class="panel">
+    <summary>Cómo se calcula</summary>
+    <p>Se usa el círculo de confusión habitual de cada sensor (por ejemplo, 0,030 mm en fotograma completo) y las fórmulas clásicas: hiperfocal H = f² / (N · c) + f; límite cercano = s · (H − f) / (H + s − 2f); límite lejano = s · (H − f) / (H − s), o infinito si enfocas a la hiperfocal o más lejos.</p>
+    <p>Es una guía: la nitidez que percibes también depende del tamaño al que veas la foto y de tu objetivo.</p>
+  </details>
+
+  <footer>Hecho por <a href="https://www.lluisridao.com">Lluís Ridao</a>, fotógrafo · <a href="https://www.lluisridao.com/herramientas/">más herramientas gratis</a> · <a href="https://github.com/lluis-ridao/profundidad-de-campo">código</a></footer>
+</main>
+<script>
+(() => {
+  const F = [1.4, 1.8, 2, 2.8, 3.5, 4, 5.6, 6.3, 8, 9, 11, 13, 16, 18, 22, 27, 32, 45];
+  const $ = id => document.getElementById(id);
+  // Distancia: escala logarítmica de 0,2 m a 100 m
+  const distDe = v => 0.2 * Math.pow(500, v / 100);
+  const fmt = m => !isFinite(m) ? '∞' : m < 1 ? Math.round(m * 100) + ' cm' : (m < 10 ? m.toFixed(2) : m.toFixed(1)).replace('.', ',') + ' m';
+
+  function calcular() {
+    const c = +$('sensor').value, f = Math.max(1, +$('focal').value || 35), N = F[+$('diaf').value];
+    const s = distDe(+$('dist').value) * 1000; // en mm
+    $('vf').textContent = 'f/' + String(N).replace('.', ',');
+    $('vd').textContent = fmt(s / 1000);
+    const H = f * f / (N * c) + f;
+    const cerca = s * (H - f) / (H + s - 2 * f);
+    const lejos = s >= H ? Infinity : s * (H - f) / (H - s);
+    $('cerca').textContent = fmt(cerca / 1000);
+    $('lejos').textContent = fmt(lejos / 1000);
+    $('total').textContent = isFinite(lejos) ? fmt((lejos - cerca) / 1000) : '∞';
+    $('hiper').textContent = fmt(H / 1000);
+
+    // Barra: escala hasta 2,5 veces la distancia de enfoque
+    const max = Math.max(s * 2.5, 1000);
+    const pct = x => Math.min(100, x / max * 100);
+    $('zona').style.left = pct(cerca) + '%';
+    $('zona').style.width = (pct(isFinite(lejos) ? lejos : max) - pct(cerca)) + '%';
+    $('foco').style.left = pct(s) + '%';
+    $('esc-med').textContent = fmt(max / 2000);
+    $('esc-max').textContent = fmt(max / 1000) + (isFinite(lejos) && lejos <= max ? '' : ' →');
+
+    $('consejo').textContent = s >= H
+      ? 'Estás enfocando a la hiperfocal o más lejos: todo desde ' + fmt(cerca / 1000) + ' hasta el infinito saldrá nítido. Ideal para paisaje y calle.'
+      : 'Para tener nítido hasta el infinito, enfoca a ' + fmt(H / 1000) + ' (la hiperfocal): saldrá nítido desde ' + fmt(H / 2000) + '.';
+  }
+  ['sensor', 'focal', 'diaf', 'dist'].forEach(id => $(id).addEventListener('input', calcular));
+  calcular();
+})();
+</script>
+</body>
+</html>
